@@ -1,133 +1,111 @@
-# Assembly-Level Procedure & Stack Management
+# Assembly Programming with I/O, Stack, Procedures, and Recursion
 
-A **low-level systems project implemented in assembly** that demonstrates procedure calling conventions, stack-based execution, recursion, and register-level state management.
-
-The project focuses on **explicit control of execution flow and memory**, mirroring how high-level language features are implemented at the machine level.
+Three RISC-V style assembly programs covering console I/O, recursive procedures with stack management, and string manipulation using character-level memory operations.
 
 ---
 
-## 🔍 Overview
+## Programs
 
-This repository implements a set of assembly programs that exercise core systems concepts:
+### `dex1.asm` — Name Greeter
 
-* Procedure calls and returns
-* Stack-based parameter passing and local storage
-* Recursive execution
-* Register allocation under constrained environments
-* User input/output at the assembly level
+Prompts the user for their name and prints a personalised greeting.
 
-All logic is implemented directly in assembly without reliance on compiler-managed abstractions.
+**What it does:**
+1. Prints `"What is your name?"`
+2. Reads a string from input into `x28`
+3. Prints `"Hello "`, then the entered name, then `"!"`
 
----
-
-## 🧠 Systems Design & Execution Model
-
-### Procedure Calling Conventions
-
-The project strictly follows standard calling conventions:
-
-* Parameters passed via registers and/or stack
-* Return values propagated through designated registers
-* Caller–callee responsibilities explicitly enforced
-* Stack frames created and torn down manually
-
-This provides a clear understanding of how function calls are implemented below high-level languages.
+**Concepts:** `ecall` for string print (`4`) and string input (`9`), string constants with `DC`.
 
 ---
 
-### Stack Management
+### `dex2.asm` — Recursive GCD
 
-The stack is used explicitly to:
+Computes the Greatest Common Divisor of two integers using recursive Euclidean algorithm with proper stack discipline.
 
-* Preserve register state across procedure calls
-* Store return addresses
-* Support nested and recursive calls
-* Maintain execution correctness under control-flow changes
+**What it does:**
+1. Prompts for two integers `a` and `b`
+2. Calls `gcd(a, b)` recursively using `jal` and `jalr`
+3. Prints `"GCD of a and b:"` followed by the result
 
-Stack discipline is enforced to ensure deterministic behavior and correct unwinding.
+**Recursive logic:**
+```
+gcd(a, b):
+    if a == 0: return b
+    return gcd(b % a, a)
+```
 
----
+**Stack frame per call** — three values pushed and popped around each recursive call:
 
-## 🔁 Recursive Computation
+| Slot | Value | Offset |
+|---|---|---|
+| `x1` | Return address | `-8(sp)` |
+| `a1` | Argument b | `-16(sp)` |
+| `a0` | Argument a | `-24(sp)` |
 
-### Euclidean GCD Algorithm
-
-A recursive implementation of the **Euclidean algorithm** computes the greatest common divisor of two positive integers:
-
-* Base case and recursive case handled explicitly
-* Stack frames used to preserve state across recursive calls
-* Modulo operations performed at the instruction level
-
-This demonstrates recursion without compiler support and highlights how high-level recursion maps to stack operations.
-
----
-
-## 🧩 Register-Constrained Design
-
-The project includes **non-stack-based procedure implementations**, requiring:
-
-* Manual preservation of intermediate values
-* Careful register allocation to avoid clobbering state
-* Explicit tracking of additional registers used to replace stack storage
-
-This models real-world constraints found in embedded systems and low-level performance-critical code.
+**Concepts:** recursive procedure calls, manual stack management with `sd`/`ld`, `rem` instruction, `jal`/`jalr` for call and return.
 
 ---
 
-## 🔄 Input / Output Handling
+### `dex3.asm` — String Delete / Insert
 
-User interaction is handled entirely at the assembly level:
+Asks the user to choose between deleting or inserting a character in a string, then performs the operation in-place at the byte level.
 
-* Reading input values from standard input
-* Parsing and validating numeric data
-* Producing formatted output
+**Input:** type `0` to delete, `1` to insert.
 
-This reinforces understanding of system calls and low-level I/O mechanisms.
+#### Delete (`delch`)
+Removes characters starting at a given address by shifting all following characters left one position until the null terminator. Calls `delch1` once per character to be deleted.
 
----
+```
+Before: "sampled text"
+delete 6 chars from index 6 --> "text"
+```
 
-## 🔬 Validation & Correctness
+#### Insert (`insch`)
+Inserts a source string (`str2 = "new"`) into a target string (`str1`) at a given position by copying the source characters into the target byte-by-byte using `insch1`.
 
-Correctness is ensured through:
+```
+Before: "sampled text"
+insert "new" at position 7 --> "sampleднew text"
+```
 
-* Strict adherence to calling conventions
-* Controlled stack growth and cleanup
-* Deterministic output for given inputs
-* Explicit handling of edge cases (e.g., zero values in recursion)
+**Callee-saved registers** — both `delch` and `insch` save and restore `x1`, `s0`, and `s1` to static memory (`c`) rather than using the stack:
 
-These practices reflect defensive systems programming principles.
+```asm
+sd  x1,   c(x0)      # save return address
+sd  s0,   c+8(x0)    # save s0
+sd  s1,   c+16(x0)   # save s1
+...
+ld  x1,   c(x0)      # restore before return
+```
 
----
-
-## 🛠️ Technologies & Concepts
-
-* **Language:** Assembly
-* **Execution Model:** Stack-based procedure calls
-* **Core Concepts:**
-
-  * Calling conventions
-  * Stack frames
-  * Recursion at the machine level
-  * Register allocation
-  * Low-level I/O
-  * Control flow and state preservation
+**Concepts:** byte-level memory access with `lb`/`sb`, procedure calls with callee-saved register conventions, in-place string mutation, branch-based loops.
 
 ---
 
-## 🚀 Why This Project Matters
+## Key Instructions Used
 
-This project demonstrates skills directly relevant to **FAANG-scale software engineering and systems roles**:
-
-* Deep understanding of how high-level abstractions map to hardware
-* Ability to reason about execution state and memory explicitly
-* Comfort working under strict resource constraints
-* Experience implementing recursion and procedures without compiler support
-* Strong foundation for performance-critical and systems-level work
+| Instruction | Description |
+|---|---|
+| `ecall x, y, 4` | Print string at address `y` |
+| `ecall x, y, 5` | Read integer into `x` |
+| `ecall x, y, 9` | Read string into `x` |
+| `ebreak` | Breakpoint / halt |
+| `jal x1, label` | Jump and link (call procedure) |
+| `jalr x0, 0(x1)` | Jump and link register (return) |
+| `sd` / `ld` | Store / load double-word (64-bit) |
+| `sb` / `lb` | Store / load byte |
+| `rem` | Remainder (modulo) |
+| `DC` | Define characters (string constant) |
+| `DM` | Define memory (reserve double-words) |
 
 ---
 
-## 👤 Author
+## Project Structure
 
-**Computer Science (Honors)**  
-York University  
-Third-Year Computer Science Honors Student
+```
+Assembly Programming with IO, Stack, Procedures, and Recursion/
+├── dex1.asm    # Console I/O: name greeter
+├── dex2.asm    # Recursive GCD with stack management
+└── dex3.asm    # String delete and insert procedures
+```
